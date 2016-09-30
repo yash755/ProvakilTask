@@ -1,9 +1,9 @@
 import requests
 import json
 import pdb
+import re
 from bs4 import BeautifulSoup
 
-# pdb.set_trace()
 
 
 def emptyrequest(case_type,case_no,case_year):  #To get important parameters.
@@ -20,14 +20,10 @@ def emptyrequest(case_type,case_no,case_year):  #To get important parameters.
       for element in payload_elements:
             payload[element.get('name')] = element.get('value')
 
-      # for x in payload:
-      #       print x
       payload["ctl00$content2$ddl_case"] = case_type
       payload["ctl00$content2$txt_no"] = case_no
       payload["ctl00$content2$ddl_year"] = case_year
-
-      
-      case_list(payload,cookies)
+      return case_list(payload,cookies)
 
 
 def case_list(payload,cookies):
@@ -36,49 +32,30 @@ def case_list(payload,cookies):
       html = BeautifulSoup(response.content, 'html.parser')
       payload_elements = []
       payload_elements = html.find_all("input")
-
-
       for element in payload_elements:
              payload[element.get('name')] = element.get('value')
-
-
       payload.pop("ctl00$content2$Button1",None)
       payload.pop("ctl00$content2$BtnSearch",None)
       payload.pop("ctl00$content2$btn_submit",None)
-  
-
-      #payload['__EVENTTARGET'] = "ctl00$content2$grv_all$ctl02$lnkbtnshowall"
       payload['__EVENTARGUMENT'] = ""
       payload['__LASTFOCUS'] = ""
-
-      # payload_elements.extend(html.find_all("select"))
-
-      # print html.find_all("select")
-      # payload = {}
-      # for element in payload_elements:
-      #       payload[element.get('name')] = element.get('value')
-
-      rows = html.find(id="ctl00_content2_grv_all").find_all('tr')
+      resp = []
+      rows = html.find("table", {"id" : lambda L: L and L.startswith('ctl00_content2_grv')}).find_all('tr')
       for row in rows:
             cols = row.find_all('td')
 
-            # if cols[0] != Null and cols[0].text.strip() == "No Data Found":
-            #       print "No Data"
-            #       break
-
-
-            #############No valid for all tables change the tables
-            
-
             if len(cols) >0:
                   links = cols[-1].find_all('a')
-                  if len(links) >0 :
+
+                  if cols[0] != None and cols[0].text.strip() == "No Data Found":
+                        break
+                  elif len(links) >0 :
                         link = links[0].get('href')
                         trg = link.split('(')
                         event_trg =  trg[1].split(',')
                         payload['__EVENTTARGET'] = event_trg[0].replace("'","")
-                        #case_details(payload,cookies)
-
+                        resp.append(case_details(payload,cookies))
+      return resp
 
 
 
@@ -91,15 +68,40 @@ def case_details(payload,cookies):
       url = 'http://www.greentribunal.gov.in/search_all_case.aspx'
       response = requests.post(url, data=payload, cookies=cookies)
       html = BeautifulSoup(response.content, 'html.parser')
-      print html
+      data = {}
+      data['petitioner'] =  html.find(id="ctl00_content2_lblpartyname3").text.strip()
+      data['respondent'] = html.find(id="ctl00_content2_lblpartyname1").text.strip()
+      if html.find(id="ctl00_content2_lblstatus").text.strip() == "DisposedOff":
+            data['is_disposed'] = True
+      else:
+            data['is_disposed'] = False
 
-      
+      return data
 
+
+def inputs():
+      input_list = []
+      input_list.append(raw_input("Enter Case Type ??"))
+      input_list.append(raw_input("Enter Case No ??"))
+      input_list.append(raw_input("Enter Case Year ??"))
+
+      return input_list
 
 if __name__ == '__main__':
       # case_type = raw_input("Enter Case Type ??")
       # case_no = raw_input("Enter Case No. ??")
       # case_year = raw_input("Enter Case Year ??")
       # emptyrequest(case_type,case_no,case_year)
-      emptyrequest("3","496/2015","2015")
+
+      input_list = inputs()
+
+      print input_list
+      
+      lists = emptyrequest(input_list[0],input_list[1],input_list[2])
+
+
+      if not lists:
+             print "Sorry ! No data found"
+      else:
+            print json.dumps(lists)
 
