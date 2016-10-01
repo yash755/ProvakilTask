@@ -10,7 +10,7 @@ except ConnectionFailure as e:
 	print repr(e)
 
 input_list = task.inputs()	
-lists = task.emptyrequest(input_list[0],input_list[1],input_list[2])
+lists = task.get_case_status(input_list[0],input_list[1],input_list[2])
 db.cases.drop()
 if not lists:
              print "Sorry ! No data found"
